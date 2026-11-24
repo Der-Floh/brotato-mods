@@ -1,0 +1,6 @@
+out/
+local/
+src/ThirdParty/*
+!src/ThirdParty/ThirdParty-Mods.csv
+tests/harness/run/
+CLAUDE.md

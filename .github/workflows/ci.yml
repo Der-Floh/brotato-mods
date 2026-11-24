@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pack mods
+        shell: pwsh
+        run: ./.vscode/build/build.ps1 -AllowEmpty
+
+      - name: Validate packed mods
+        shell: pwsh
+        run: ./.vscode/build/validate.ps1
+
+      - name: Upload packed mods
+        uses: actions/upload-artifact@v4
+        with:
+          name: mods
+          path: |
+            out/**/*.zip
+            out/workshop/*.txt
+          if-no-files-found: warn
