@@ -1,0 +1,76 @@
+{
+    "name": "auto_brotato",
+    "namespace": "der_floh",
+    "version_number": "1.0.0",
+    "description": "Automates the end of a wave: recycles unwanted crate items, takes wanted ones, picks level-ups by weight and starts the next wave, each switchable on its own.",
+    "website_url": "https://github.com/Der-Floh/brotato-mods",
+    "dependencies": [],
+    "extra": {
+        "godot": {
+            "authors": [
+                "der_floh"
+            ],
+            "tags": [
+                "Utilities",
+                "GUI"
+            ],
+            "description_rich": "",
+            "optional_dependencies": [
+                "dami-ModOptions",
+                "Oudstand-ModOptions"
+            ],
+            "load_before": [],
+            "incompatibilities": [],
+            "config_schema": {
+                "title": "AUTO_BROTATO",
+                "type": "object",
+                "properties": {
+                    "auto_recycle_crate_items": {
+                        "title": "AUTO_RECYCLE_CRATE_ITEMS",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "auto_take_crate_items": {
+                        "title": "AUTO_TAKE_CRATE_ITEMS",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "auto_pick_level_ups": {
+                        "title": "AUTO_PICK_LEVEL_UPS",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "auto_start_next_wave": {
+                        "title": "AUTO_START_NEXT_WAVE",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "next_wave_delay": {
+                        "title": "NEXT_WAVE_DELAY",
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 10.0,
+                        "multipleOf": 1.0,
+                        "format": "%d s",
+                        "default": 0.0
+                    },
+                    "next_wave_limit": {
+                        "title": "NEXT_WAVE_LIMIT",
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 200.0,
+                        "multipleOf": 1.0,
+                        "format": "%d",
+                        "default": 0.0
+                    }
+                }
+            },
+            "compatible_mod_loader_version": [
+                "6.3.0"
+            ],
+            "compatible_game_version": [
+                "1.2.0.4"
+            ]
+        }
+    }
+}

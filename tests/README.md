@@ -88,6 +88,7 @@ The test runs inside the game. The base class, [`integration_test.gd`](harness/s
 | Game | `tree`, `access`, `commands`, `wave()`, `shop()`, `player(index)`; the game's autoloads (`RunData`, `ItemService`, `ProgressData`, `DebugService`, ...) are globals |
 | Mods | `mod(id)` (the mod's `mod_main` script, for its static functions and settings), `has_mod(id)`, `require_mods([ids])` |
 | Fixtures | `fresh_run(character, weapon, difficulty, invulnerable)`, `in_wave()`, `in_shop()`, `end_wave(skip_choices)`, `next_wave()`: each yields and returns `false` after recording the failure when it can't get there |
+| End of wave | `queue_level_ups(count)`, `queue_crates(count, legendary)` during a wave; `end_wave_async()` ends it without waiting; `await_offer()` waits for a level-up or crate item; `show_crate_item(id, cursed, curse_factor, weapon)` swaps the crate item on screen; `offer_container()` is the panel with its buttons; `await_shop()` |
 | Cheats | `give_item(id, count)`, `give_weapon(id)`, `press_key(KEY_ESCAPE)`, and the harness commands through `commands.<name>({...})` |
 | Waiting | `frames(n)`, `physics_frames(n)` |
 | Restoring | `use_setting(mod_id, setting, value)` (through `set_<setting>`/`get_<setting>`), `use_value(object, property, value)`, `on_cleanup(target, method, args)` |
@@ -104,6 +105,7 @@ Things to know:
 - **Logged errors fail the test.** Brotato's release build reports no GDScript runtime errors: an index out of range or a property read on null quietly gives `null`, and a method call on null closes the game at once. So the runner reads `godot.log` after each test and turns every `ERROR:` or `SCRIPT ERROR` line the test added (parse errors, `push_error`, GML's `ModLoaderLog.error`, engine errors) into an error with its message. A game that closes during a test is reported as such and its session restarted. Check results with expectations rather than counting on errors.
 - **Tests are compiled from the repo** each time they run, with `res://tests/integration/...` as their path, so errors name the file. They can't `preload` other files or use `class_name`, and must not name another mod's classes or files unless that mod is in every session the file runs in; use `has_mod()` and `mod()` instead. Variables whose type comes from the game's autoloads need an explicit type, because `:=` can't infer it.
 - **Make randomness irrelevant.** Force the state a test needs (items with `give_item`, flags on `DebugService`) instead of waiting for luck. The runner seeds the random generator per test, so a test repeats the same way.
-- **Keys:** `harness.ps1 call action` sends input actions; use `press_key()` for code that reads key events.
+- **Keys:** `harness.ps1 call action` sends input actions; use `press_key()` for code that reads key events. It sends each event at the start of a frame, like real input; an event sent from a `physics_frame` or `frame_post_draw` callback that switches menu pages logs engine errors.
+- **One scene change per frame.** Mods that watch the current scene see it once per frame, so give a scene a few frames before changing it again, as a player would.
 
 Try a single test while writing it with `-Mods <id> -Session solo -Test <name>`; add `-NoBuild` when only test files changed.

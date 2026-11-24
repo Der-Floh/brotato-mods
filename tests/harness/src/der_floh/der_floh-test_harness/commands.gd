@@ -6,6 +6,8 @@ const DEFAULT_RUN := {"character": "character_well_rounded", "weapon": "weapon_k
 const SCENE_TIMEOUT_MS := 30000
 const ACTION_MODES := ["tap", "press", "release"]
 const PLAYER := 0
+const CRATE_PATH := "res://items/consumables/item_box/item_box_data.tres"
+const LEGENDARY_CRATE_PATH := "res://items/consumables/legendary_item_box/legendary_item_box_data.tres"
 const HANDLERS := {
 	"status": "status",
 	"eval": "eval_code",
@@ -15,6 +17,9 @@ const HANDLERS := {
 	"new_run": "new_run",
 	"end_wave": "end_wave",
 	"next_wave": "next_wave",
+	"queue_level_ups": "queue_level_ups",
+	"queue_crates": "queue_crates",
+	"show_crate_item": "show_crate_item",
 	"give_item": "give_item",
 	"give_weapon": "give_weapon",
 	"set_gold": "set_gold",
@@ -61,6 +66,7 @@ func status(_args := {}) -> Dictionary:
 		"health": player_data.current_health if player_data else 0,
 		"weapons": _ids(player_data.weapons) if player_data else [],
 		"items": _ids(player_data.items) if player_data else [],
+		"offer": _offer_state(PLAYER),
 		"mods": _mod_list(),
 	})
 
@@ -80,6 +86,8 @@ func screenshot(args: Dictionary):
 	var image: Image = _access.tree.root.get_texture().get_data()
 	image.flip_y()
 	var error := image.save_png(path)
+	# Callers would otherwise go on inside the renderer's frame_post_draw, where sent input breaks the GUI.
+	yield(_access.tree, "idle_frame")
 	if error != OK:
 		return _fail("Saving %s failed (error %d)." % [path, error])
 	return _ok({"path": path})
@@ -116,7 +124,8 @@ func new_run(args: Dictionary):
 
 
 ## Ends the running wave. With skip_choices (default), level-up and crate choices are dropped so it goes
-## straight to the shop, or to the end screen when the run is over.
+## straight to the shop, or to the end screen when the run is over. With wait false it returns at once,
+## so a test can watch the level-up and crate choices.
 func end_wave(args: Dictionary):
 	var wave = _access.wave()
 	if wave == null:
@@ -124,6 +133,9 @@ func end_wave(args: Dictionary):
 	_skip_choices = bool(args.get("skip_choices", true))
 	wave._wave_timer.stop()
 	wave._on_WaveTimer_timeout()
+	if not bool(args.get("wait", true)):
+		yield(_access.tree, "idle_frame")
+		return _ok()
 	if not yield(_access.wait_until(self, "_left_wave", SCENE_TIMEOUT_MS), "completed"):
 		return _fail("The wave did not end in time; with skip_choices false, level-up choices wait for a pick.")
 	return status()
@@ -137,6 +149,51 @@ func next_wave(_args: Dictionary):
 	if not yield(_access.wait_until(_access, "wave", SCENE_TIMEOUT_MS), "completed"):
 		return _fail("The next wave did not start in time.")
 	return status()
+
+
+# --- End-of-wave choices ---
+
+## Levels the player up during a wave, so a level-up choice waits at the end of the wave.
+func queue_level_ups(args: Dictionary) -> Dictionary:
+	var player_index := int(args.get("player", PLAYER))
+	if _access.wave() == null:
+		return _fail("queue_level_ups needs a running wave.")
+	for i in max(1, int(args.get("count", 1))):
+		RunData.level_up(player_index)
+	return _ok({"level": RunData.get_player_level(player_index)})
+
+
+## Queues crates as if the player had picked them up during the wave (main.gd on_consumable_picked_up).
+func queue_crates(args: Dictionary) -> Dictionary:
+	var player_index := int(args.get("player", PLAYER))
+	var wave = _access.wave()
+	if wave == null:
+		return _fail("queue_crates needs a running wave.")
+	var crate = load(LEGENDARY_CRATE_PATH if bool(args.get("legendary", false)) else CRATE_PATH)
+	for i in max(1, int(args.get("count", 1))):
+		var to_process = UpgradesUI.ConsumableToProcess.new()
+		to_process.consumable_data = crate
+		to_process.player_index = player_index
+		wave._consumables_to_process[player_index].push_back(to_process)
+		wave._things_to_process_player_containers[player_index].consumables.add_element(crate)
+	return _ok({"queued": wave._consumables_to_process[player_index].size()})
+
+
+## Replaces the crate item on screen with a copy of the given item or weapon, cursed if asked.
+func show_crate_item(args: Dictionary) -> Dictionary:
+	var player_index := int(args.get("player", PLAYER))
+	var container = _access.upgrade_container(player_index)
+	if container == null or not container.is_showing_item():
+		return _fail("show_crate_item needs a crate item on screen; queue a crate and end the wave with wait false.")
+	var element_id := String(args.get("id", ""))
+	var source = _element(ItemService.weapons if bool(args.get("weapon", false)) else ItemService.items, element_id)
+	if source == null:
+		return _fail("'%s' is not an item or weapon id." % element_id)
+	var item = source.duplicate()
+	item.is_cursed = bool(args.get("cursed", false))
+	item.curse_factor = float(args.get("curse_factor", 0.0))
+	container.show_item(item)
+	return _ok(_offer_state(player_index))
 
 
 # --- Cheats ---
@@ -227,6 +284,20 @@ func _left_wave() -> bool:
 			wave._upgrades_to_process[player_index].clear()
 			wave._consumables_to_process[player_index].clear()
 	return _access.shop() != null or _access.end_run() != null
+
+
+func _offer_state(player_index: int):
+	if not _access.is_choosing(player_index):
+		return null
+	var container = _access.upgrade_container(player_index)
+	if container.is_showing_item():
+		var item = container._item_data
+		return {"kind": "item", "id": item.my_id, "cursed": item.is_cursed, "curse_factor": item.curse_factor}
+	var options := []
+	for upgrade_ui in container._get_upgrade_uis():
+		if upgrade_ui.visible and upgrade_ui.upgrade_data:
+			options.append(upgrade_ui.upgrade_data.my_id)
+	return {"kind": "level_up", "options": options}
 
 
 func _mod_list() -> Array:

@@ -1,0 +1,14 @@
+{
+    "sessions": [
+        {
+            "name": "with-dami-mod-options",
+            "third_party": ["dami-ModOptions"],
+            "tests": ["test_bridges.gd", "test_menus.gd", "test_settings.gd"]
+        },
+        {
+            "name": "with-oudstand-mod-options",
+            "third_party": ["Oudstand-ModOptions"],
+            "tests": ["test_bridges.gd", "test_menus.gd", "test_settings.gd"]
+        }
+    ]
+}

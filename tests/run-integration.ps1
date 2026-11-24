@@ -220,11 +220,11 @@ function New-TestResult {
 }
 
 function Start-PlannedSession {
-    param([Parameter(Mandatory)][psobject]$Entry, [switch]$Build)
+    param([Parameter(Mandatory)][psobject]$Entry)
 
     Clear-HarnessModConfig
     $extra = @(Get-ThirdPartyZip $Entry.ThirdParty)
-    $started = Start-HarnessSession -Mods $Entry.Mods -Extra $extra -NoBuild:(-not $Build) -GameDirectory $GameDirectory
+    $started = Start-HarnessSession -Mods $Entry.Mods -Extra $extra -NoBuild -GameDirectory $GameDirectory
     $active = @($started.status.mods | Where-Object active | ForEach-Object id)
     $notLoaded = @($Entry.Mods | Where-Object { $active -notcontains $_ })
     if ($notLoaded) { throw "GML did not load: $($notLoaded -join ', '). See modloader.log." }
@@ -283,14 +283,14 @@ function Stop-PlannedSession {
 }
 
 function Invoke-PlannedSession {
-    param([Parameter(Mandatory)][psobject]$Entry, [switch]$Build)
+    param([Parameter(Mandatory)][psobject]$Entry)
 
     $name = $Entry.Names -join ', '
     $thirdParty = if ($Entry.ThirdParty) { " + $($Entry.ThirdParty -join ', ')" } else { '' }
     Write-Host "`n[$name] $($Entry.Mods.Count) mod(s)$thirdParty, $($Entry.Tests.Count) test(s)" -ForegroundColor Cyan
     $results = [System.Collections.Generic.List[object]]::new()
     try {
-        Start-PlannedSession $Entry -Build:$Build
+        Start-PlannedSession $Entry
     }
     catch {
         foreach ($item in $Entry.Tests) { $results.Add((New-TestResult $item $name 'error' @("The session did not start: $($_.Exception.Message)"))) }
@@ -403,11 +403,10 @@ if ($List) {
 Remove-Item -LiteralPath $ResultsDirectory -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
+if (-not $NoBuild) { Invoke-HarnessBuild }
 $allResults = [System.Collections.Generic.List[object]]::new()
-$build = -not $NoBuild
 foreach ($entry in $plan) {
-    foreach ($result in Invoke-PlannedSession $entry -Build:$build) { $allResults.Add($result) }
-    $build = $false
+    foreach ($result in Invoke-PlannedSession $entry) { $allResults.Add($result) }
 }
 
 Write-JUnitReport $allResults

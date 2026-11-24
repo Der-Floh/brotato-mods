@@ -12,6 +12,7 @@ extends Reference
 const DEFAULT_CHARACTER := "character_well_rounded"
 const DEFAULT_WEAPON := "weapon_knife_1"
 const KEY_HOLD_FRAMES := 2
+const DEFAULT_WAIT_MS := 10000
 
 var tree: SceneTree
 var access
@@ -109,6 +110,45 @@ func next_wave():
 	return _succeeded(response)
 
 
+## Ends the wave without waiting, so the test can watch its level-up and crate choices.
+func end_wave_async():
+	var response = yield(_command("end_wave", {"skip_choices": false, "wait": false}), "completed")
+	return _succeeded(response)
+
+
+## Waits until the player has a level-up or crate item on screen that accepts a press.
+func await_offer(player_index := 0, timeout_ms := DEFAULT_WAIT_MS):
+	var shown = yield(access.wait_until(access, "is_choosing", timeout_ms, [player_index]), "completed")
+	return shown
+
+
+## Waits until the shop is open.
+func await_shop(timeout_ms := DEFAULT_WAIT_MS):
+	var opened = yield(access.wait_until(access, "shop", timeout_ms), "completed")
+	return opened
+
+
+## The player's level-up and crate panel while one is shown, else null.
+func offer_container(player_index := 0):
+	return access.upgrade_container(player_index) if access.is_choosing(player_index) else null
+
+
+func queue_level_ups(count := 1, player_index := 0):
+	var response = yield(_command("queue_level_ups", {"count": count, "player": player_index}), "completed")
+	return _succeeded(response)
+
+
+func queue_crates(count := 1, legendary := false, player_index := 0):
+	var response = yield(_command("queue_crates", {"count": count, "legendary": legendary, "player": player_index}), "completed")
+	return _succeeded(response)
+
+
+## Replaces the crate item on screen with a copy of an item (or weapon), cursed with curse_factor if asked.
+func show_crate_item(element_id: String, cursed := false, curse_factor := 0.0, weapon := false, player_index := 0):
+	var response = yield(_command("show_crate_item", {"id": element_id, "cursed": cursed, "curse_factor": curse_factor, "weapon": weapon, "player": player_index}), "completed")
+	return _succeeded(response)
+
+
 func give_item(item_id: String, count := 1):
 	var response = yield(_command("give_item", {"id": item_id, "count": count}), "completed")
 	return _succeeded(response)
@@ -119,15 +159,17 @@ func give_weapon(weapon_id: String):
 	return _succeeded(response)
 
 
-## Presses and releases a key, with both key codes set like a real key press.
+## Presses and releases a key, with both key codes set like a real key press. Each event is sent at the start
+## of a frame, where real input arrives; sent from a physics callback, a page switch breaks the engine's lists.
 func press_key(scancode: int):
 	for pressed in [true, false]:
+		yield(tree, "idle_frame")
 		var event := InputEventKey.new()
 		event.scancode = scancode
 		event.physical_scancode = scancode
 		event.pressed = pressed
 		Input.parse_input_event(event)
-		yield(physics_frames(KEY_HOLD_FRAMES), "completed")
+		yield(frames(KEY_HOLD_FRAMES), "completed")
 
 
 # --- Restoring ---

@@ -18,7 +18,7 @@ Every mod in this repository has its own README with all its settings, linked fr
 
 | Mod | Author | Description |
 | --- | ------ | ----------- |
-| No mods yet | | |
+| [Auto Brotato](src/der_floh/der_floh-auto_brotato/README.md) (`der_floh-auto_brotato`) | der_floh | Recycles unwanted crate items, takes wanted ones, picks level-ups by weight and starts the next wave, each switchable on its own |
 
 ---
 

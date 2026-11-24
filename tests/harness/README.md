@@ -44,16 +44,19 @@ Run from the repo root in PowerShell 7 or Windows PowerShell 5.1, with Steam run
 
 `-Compact` prints `status`, `call` and `eval` results on one line without the mod list. The game folder comes from `-GameDirectory`, the `BROTATO_GAME_DIR` environment variable, or your Steam libraries.
 
-Scripts can import [`Harness.psm1`](Harness.psm1) instead: `Start-HarnessSession`, `Stop-HarnessSession`, `Invoke-HarnessCommand`, `Get-HarnessLog` and `Clear-HarnessModConfig`.
+Scripts can import [`Harness.psm1`](Harness.psm1) instead: `Invoke-HarnessBuild`, `Start-HarnessSession`, `Stop-HarnessSession`, `Invoke-HarnessCommand`, `Get-HarnessLog`, `Clear-HarnessModConfig` and `Test-HarnessGameRunning`. `start` also lists every loaded mod in the test profile's `mod_user_profiles.json`, pointing at a config file that exists, because GML logs an error for a mod with settings that the profile doesn't list yet.
 
 ## API commands
 
 | Command | Arguments (default) | What it does |
 | --- | --- | --- |
-| `status` | | pid, `user_data_dir`, scene, in wave, in shop, paused, unlock-all save, wave, zone, difficulty, character, gold, level, health, weapons, items, loaded mods |
+| `status` | | pid, `user_data_dir`, scene, in wave, in shop, paused, unlock-all save, wave, zone, difficulty, character, gold, level, health, weapons, items, the level-up or crate item on screen, loaded mods |
 | `new_run` | `character` (`character_well_rounded`), `weapon` (`weapon_knife_1`, `""` for none), `difficulty` (0), `zone` (0), `invulnerable` (`true`) | Starts a solo run the way the character, weapon and difficulty menus do, and waits for wave 1. |
-| `end_wave` | `skip_choices` (`true`) | Ends the running wave and waits for the shop, or the end screen when the run is over. Skipping drops the level-up and crate choices; without it, the game waits for them. |
+| `end_wave` | `skip_choices` (`true`), `wait` (`true`) | Ends the running wave and waits for the shop, or the end screen when the run is over. Skipping drops the level-up and crate choices; without it, the game waits for them. With `wait` false it returns at once, so the choices can be watched. |
 | `next_wave` | | Leaves the shop and waits for the next wave. |
+| `queue_level_ups` | `count` (1), `player` (0) | Levels the player up during a wave, so level-up choices wait at its end. |
+| `queue_crates` | `count` (1), `legendary` (`false`), `player` (0) | Queues crates as if picked up during the wave. |
+| `show_crate_item` | `id`, `weapon` (`false`), `cursed` (`false`), `curse_factor` (0), `player` (0) | Replaces the crate item on screen with a copy of an item or weapon, cursed if asked. |
 | `give_item` | `id`, `count` (1) | Adds an item such as `item_helmet`, as a purchase would. A running wave's player gets its stats when the next wave starts. |
 | `give_weapon` | `id` | Adds a weapon such as `weapon_pistol_1`; a running wave's player gets it when the next wave starts. |
 | `set_gold` | `amount` | Sets the materials. |

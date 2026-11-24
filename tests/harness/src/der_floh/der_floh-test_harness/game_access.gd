@@ -48,6 +48,29 @@ func title_screen() -> Node:
 	return current if current and current.filename == TITLE_SCREEN_SCENE else null
 
 
+## The level-up and crate screen of the wave scene that matches the run (solo or co-op).
+func upgrades_ui() -> Node:
+	var current := scene()
+	if current == null or current.filename != WAVE_SCENE:
+		return null
+	var ui = current._coop_upgrades_ui if RunData.is_coop_run else current._upgrades_ui
+	return ui if is_instance_valid(ui) else null
+
+
+func upgrade_container(player_index := 0) -> Node:
+	var ui := upgrades_ui()
+	return ui._get_player_container(player_index) if ui else null
+
+
+## True while the player has a level-up or crate item on screen and its buttons accept a press.
+func is_choosing(player_index := 0) -> bool:
+	var ui := upgrades_ui()
+	if ui == null or not ui.visible or not ui._player_is_choosing[player_index]:
+		return false
+	var container = ui._get_player_container(player_index)
+	return container != null and not container._button_pressed
+
+
 func player(index := 0) -> Node:
 	var current := wave()
 	if current == null or index >= current._players.size():
@@ -66,11 +89,11 @@ func is_mod_active(mod_id: String) -> bool:
 	return store != null and store.mod_data.has(mod_id) and store.mod_data[mod_id].is_active
 
 
-## Waits until target.call(method) is true; always waits at least one frame, so callers can yield on it.
-func wait_until(target: Object, method: String, timeout_ms: int):
+## Waits until target.callv(method, args) is true; always waits at least one frame, so callers can yield on it.
+func wait_until(target: Object, method: String, timeout_ms: int, args := []):
 	var deadline := OS.get_ticks_msec() + timeout_ms
 	yield(tree, "idle_frame")
-	while not target.call(method):
+	while not target.callv(method, args):
 		if OS.get_ticks_msec() > deadline:
 			return false
 		yield(tree, "idle_frame")

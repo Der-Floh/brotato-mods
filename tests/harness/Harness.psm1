@@ -20,6 +20,10 @@ $RealProfile = Join-Path $env:APPDATA 'Brotato'
 $TestProfile = Join-Path $env:APPDATA $TestProfileName
 $ModProfilesFile = Join-Path $TestProfile 'mod_user_profiles.json'
 $ModConfigsDirectory = Join-Path $TestProfile 'configs'
+$DefaultModProfile = 'default'
+$DefaultModConfig = 'default'
+# Oudstand-ModOptions saves its values next to the profile instead of in GML's configs.
+$ModOptionsFilePattern = 'mod_options_*.json'
 $BootstrapFolderName = 'harness'
 $BootstrapFileName = 'mod_loader_store.gd'
 
@@ -242,15 +246,40 @@ function Assert-TestProfile {
     }
 }
 
-# GML keeps a mod disabled in its user profile once it was, so a mod loaded again later would stay off.
-function Enable-TestProfileMod {
-    if (-not (Test-Path -LiteralPath $ModProfilesFile)) { return }
-    $profiles = Get-Content -LiteralPath $ModProfilesFile -Raw | ConvertFrom-Json
+function Read-TestProfileModList {
+    if (Test-Path -LiteralPath $ModProfilesFile) {
+        return Get-Content -LiteralPath $ModProfilesFile -Raw | ConvertFrom-Json
+    }
+    [pscustomobject]@{ current_profile = $DefaultModProfile; profiles = [pscustomobject]@{ $DefaultModProfile = [pscustomobject]@{ mod_list = [pscustomobject]@{} } } }
+}
+
+function Test-ModConfigFile {
+    param([Parameter(Mandatory)][string]$ModId, [Parameter(Mandatory)][string]$ConfigName)
+
+    Test-Path -LiteralPath (Join-Path (Join-Path $ModConfigsDirectory $ModId) "$ConfigName.json")
+}
+
+# GML keeps a mod disabled in its user profile once it was, logs an ERROR for a mod the profile doesn't list
+# yet, and logs another one when the profile names a config whose file is gone.
+function Update-TestProfileModList {
+    param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ModIds)
+
+    $profiles = Read-TestProfileModList
     foreach ($userProfile in $profiles.profiles.PSObject.Properties.Value) {
-        foreach ($mod in $userProfile.mod_list.PSObject.Properties.Value) {
-            $mod | Add-Member -NotePropertyName is_active -NotePropertyValue $true -Force
+        foreach ($modId in $ModIds) {
+            if (-not $userProfile.mod_list.PSObject.Properties[$modId]) {
+                $userProfile.mod_list | Add-Member -NotePropertyName $modId -NotePropertyValue ([pscustomobject]@{})
+            }
+        }
+        foreach ($property in $userProfile.mod_list.PSObject.Properties) {
+            $property.Value | Add-Member -NotePropertyName is_active -NotePropertyValue $true -Force
+            $config = $property.Value.PSObject.Properties['current_config']
+            if (-not $config -or -not (Test-ModConfigFile -ModId $property.Name -ConfigName $config.Value)) {
+                $property.Value | Add-Member -NotePropertyName current_config -NotePropertyValue $DefaultModConfig -Force
+            }
         }
     }
+    New-Item -ItemType Directory -Path $TestProfile -Force | Out-Null
     [System.IO.File]::WriteAllText($ModProfilesFile, ($profiles | ConvertTo-Json -Depth 10))
 }
 
@@ -337,9 +366,9 @@ function Start-HarnessSession {
     if (Test-Path -LiteralPath $SessionFile) { throw "A test session is still recorded in $SessionFile. Run 'harness.ps1 stop' first." }
     Assert-NoForeignOverride $game
     if (-not $NoBuild) { Invoke-ModBuild }
-    $modIds = Copy-TestMod -Mods $Mods -Extra $Extra
+    $modIds = @(Copy-TestMod -Mods $Mods -Extra $Extra)
     Save-ProfileFingerprint
-    Enable-TestProfileMod
+    Update-TestProfileModList -ModIds $modIds
 
     $session = @{ port = Get-FreePort; token = [guid]::NewGuid().ToString('N'); pid = 0; game_directory = $game }
     Save-Session $session
@@ -418,16 +447,23 @@ function Get-HarnessLog {
 
 <#
 .SYNOPSIS
-Deletes the test profile's mod configs, so the next session starts every mod with its default settings.
+Deletes the test profile's mod configs and Oudstand-ModOptions values, so the next session starts every mod with its default settings.
 #>
 function Clear-HarnessModConfig {
     if (Test-Path -LiteralPath $ModConfigsDirectory) { Remove-Item -LiteralPath $ModConfigsDirectory -Recurse -Force }
+    Get-ChildItem -LiteralPath $TestProfile -Filter $ModOptionsFilePattern -File -ErrorAction SilentlyContinue | Remove-Item -Force
 }
 
 function Test-HarnessGameRunning { Test-GameRunning }
+
+<#
+.SYNOPSIS
+Builds the repo mods and the harness mod for the next sessions started with -NoBuild.
+#>
+function Invoke-HarnessBuild { Invoke-ModBuild }
 
 function Get-HarnessRunDirectory { $RunDirectory }
 
 function Get-HarnessTestProfile { $TestProfile }
 
-Export-ModuleMember -Function Start-HarnessSession, Stop-HarnessSession, Invoke-HarnessCommand, Get-HarnessLog, Clear-HarnessModConfig, Test-HarnessGameRunning, Get-HarnessRunDirectory, Get-HarnessTestProfile
+Export-ModuleMember -Function Start-HarnessSession, Stop-HarnessSession, Invoke-HarnessCommand, Get-HarnessLog, Clear-HarnessModConfig, Test-HarnessGameRunning, Invoke-HarnessBuild, Get-HarnessRunDirectory, Get-HarnessTestProfile
