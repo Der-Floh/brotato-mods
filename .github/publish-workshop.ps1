@@ -17,7 +17,7 @@ After each upload, the item id and the uploaded version are written to .github/w
 The release to upload, such as v1.2.0, instead of picking one from the list.
 
 .PARAMETER SteamUser
-Your Steam account name. Defaults to the STEAM_USER environment variable.
+Your Steam account name. Defaults to the STEAM_USER environment variable; without either, the script asks for it.
 
 .PARAMETER Mods
 Only consider these mods of the release.
@@ -70,7 +70,7 @@ $NewItemId = '0'
 $ZipNamePattern = '^(?<mod>.+)-(?<version>\d+(\.\d+)+(-[0-9A-Za-z.-]+)?)\.zip$'
 $WorkshopItemUrl = 'https://steamcommunity.com/sharedfiles/filedetails/?id='
 $SteamCmdDownloadUrl = 'https://developer.valvesoftware.com/wiki/SteamCMD#Windows'
-$SuccessPattern = '(?m)^Success\.'
+$SuccessPattern = 'Committing update\.\.\.\s*Success\.'
 $PublishedFileIdPattern = '"publishedfileid"\s+"(\d+)"'
 
 # --- Workshop items ---
@@ -101,6 +101,7 @@ function Get-UploadState {
 
     if (-not $Items.Contains($Mod.ModId)) { return 'no Workshop item yet' }
     $uploaded = $Items[$Mod.ModId]['uploaded-version']
+    if (-not $uploaded) { return 'Workshop item without a finished upload' }
     if ($uploaded -eq $Mod.Version) { return 'on the Workshop' }
     "Workshop has $uploaded"
 }
@@ -259,7 +260,7 @@ function New-UploadPlan {
     $itemId = if ($item -and $item['published-file-id']) { $item['published-file-id'] } else { $NewItemId }
     if ($item -and $item['uploaded-version'] -eq $Mod.Version -and -not $Force) {
         Write-Host "Up to date: $($Mod.ModId) $($Mod.Version) (item $itemId)"
-        return $null
+        return
     }
 
     $folder = Join-Path $UploadDirectory $Mod.ModId
@@ -309,15 +310,29 @@ function Invoke-Upload {
 
     # Windows PowerShell turns a native command's stderr into terminating errors under 'Stop'.
     $ErrorActionPreference = 'Continue'
-    $output = & $SteamCmdPath +login $SteamUser +workshop_build_item $Plan.ItemFile +quit 2>&1 | ForEach-Object { "$_" }
+    # steamcmd writes UTF-8, but captured output is decoded with the console's code page.
+    $consoleEncoding = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    try {
+        $output = & $SteamCmdPath +login $SteamUser +workshop_build_item $Plan.ItemFile +quit 2>&1 | ForEach-Object { "$_" }
+    }
+    finally {
+        [Console]::OutputEncoding = $consoleEncoding
+    }
     $output | Write-Host
-    if (-not ($output -join "`n" -match $SuccessPattern)) { throw "steamcmd did not report success for $($Plan.ModId); see its output above." }
-    $written = (Get-Content -LiteralPath $Plan.ItemFile -Raw) -match $PublishedFileIdPattern
-    if (-not $written -or $Matches[1] -eq $NewItemId) { throw "steamcmd did not write the item id for $($Plan.ModId) into $($Plan.ItemFile)." }
-    $Matches[1]
+    ($output -join "`n") -match $SuccessPattern
 }
 
-if (-not $DryRun -and -not $SteamUser) { throw 'Pass -SteamUser or set STEAM_USER to your Steam account name.' }
+# steamcmd writes the id of a new item into the item file as soon as it creates the item.
+function Read-ItemId {
+    param([Parameter(Mandatory)][string]$ItemFile)
+
+    if ((Get-Content -LiteralPath $ItemFile -Raw) -match $PublishedFileIdPattern) { return $Matches[1] }
+    $NewItemId
+}
+
+if (-not $DryRun -and -not $SteamUser) { $SteamUser = Read-Host 'Steam account name' }
+if (-not $DryRun -and -not $SteamUser) { throw 'Enter your Steam account name, pass -SteamUser or set STEAM_USER.' }
 
 $items = Read-WorkshopItem
 $releases = @(Get-Release)
@@ -339,9 +354,15 @@ $steamCmdPath = Resolve-SteamCmd
 # Logs in once in the foreground, so password and Steam Guard prompts show; the uploads then reuse the saved login.
 & $steamCmdPath +login $SteamUser +quit
 foreach ($plan in $plans) {
-    $itemId = Invoke-Upload -SteamCmdPath $steamCmdPath -Plan $plan
-    $items[$plan.ModId] = [ordered]@{ 'published-file-id' = $itemId; 'uploaded-version' = $plan.Version }
-    Save-WorkshopItem -Items $items
+    $succeeded = Invoke-Upload -SteamCmdPath $steamCmdPath -Plan $plan
+    $itemId = Read-ItemId $plan.ItemFile
+    # A created item is recorded even when its upload failed, so the next run updates it instead of creating another.
+    if ($itemId -ne $NewItemId) {
+        $items[$plan.ModId] = [ordered]@{ 'published-file-id' = $itemId; 'uploaded-version' = $(if ($succeeded) { $plan.Version } else { '' }) }
+        Save-WorkshopItem -Items $items
+    }
+    if (-not $succeeded) { throw "steamcmd did not report success for $($plan.ModId); see its output above." }
+    if ($itemId -eq $NewItemId) { throw "steamcmd did not write the item id for $($plan.ModId) into $($plan.ItemFile)." }
     Write-Host "Uploaded: $($plan.ModId) $($plan.Version) -> $WorkshopItemUrl$itemId"
 }
 Write-Host 'Commit .github/workshop-items.json.'

@@ -76,9 +76,11 @@ Every mod folder has a `README.md`, which is packed into the zip like the mod's 
 2. **Steam Workshop.** On your PC, run [`.github/publish-workshop.ps1`](.github/publish-workshop.ps1). It lists the releases, newest first, with each mod's version and the one [`.github/workshop-items.json`](.github/workshop-items.json) records as uploaded, and asks which release to upload (`-Tag` picks one). It uploads every mod of that release whose version differs, with the version's changelog section as change note, then records the item id and the uploaded version; commit that file.
 
 ```powershell
-./.github/publish-workshop.ps1 -SteamUser <account> -DryRun
+./.github/publish-workshop.ps1 -DryRun
 ./.github/publish-workshop.ps1 -SteamUser <account>
 ```
+
+Without `-SteamUser` or the `STEAM_USER` environment variable, the upload asks for your Steam account name.
 
 The Workshop gets exactly the zip attached to the release: the script downloads it with [GitHub CLI](https://cli.github.com/) and refuses it unless `gh attestation verify` confirms the release workflow built it. Its README and changelog come from inside the zip too, so they match the released version. The upload uses [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), which asks for your password and Steam Guard code the first time and then reuses the saved login; your Steam client may be signed out while it uploads. Your login never leaves your PC. An existing item keeps the title, description, preview image, tags and visibility of its Workshop page (`-UpdateDescription` replaces the description with the converted README). A mod without an item gets a new hidden one, titled with its README heading and with `media/preview.png` as preview image; set its tags and make it public on its Workshop page.
 
