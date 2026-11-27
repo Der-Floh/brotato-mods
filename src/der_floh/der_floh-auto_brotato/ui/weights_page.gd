@@ -1,6 +1,7 @@
 extends Control
 
 ## One weight per level-up kind: an offered level-up is picked with a chance in proportion to its weight.
+## The kinds are read from the game's data whenever the page opens.
 
 signal back_button_pressed
 
@@ -15,6 +16,7 @@ const CONTENT_WIDTH := 1100
 const SEPARATION := 12
 
 var _settings: Node
+var _list: VBoxContainer
 var _rows := {}
 var _refreshing := false
 
@@ -42,6 +44,7 @@ func setup(settings: Node) -> void:
 
 ## Called by the game's Menus.switch when the page opens.
 func init() -> void:
+	_update_rows()
 	_refresh()
 	if not _rows.empty():
 		Widgets.focus(_rows.values()[0].slider)
@@ -61,13 +64,25 @@ func _rows_scroll() -> ScrollContainer:
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = SIZE_EXPAND_FILL
 	scroll.add_child(center)
-	var list := VBoxContainer.new()
-	list.rect_min_size.x = CONTENT_WIDTH
-	list.add_constant_override("separation", SEPARATION)
-	center.add_child(list)
-	for kind in Catalog.upgrade_kinds():
-		list.add_child(_weight_row(kind[0], kind[1]))
+	_list = VBoxContainer.new()
+	_list.rect_min_size.x = CONTENT_WIDTH
+	_list.add_constant_override("separation", SEPARATION)
+	center.add_child(_list)
 	return scroll
+
+
+func _update_rows() -> void:
+	var kinds: Array = Catalog.upgrade_kinds()
+	var upgrade_ids := []
+	for kind in kinds:
+		upgrade_ids.append(kind[0])
+	if upgrade_ids == _rows.keys():
+		return
+	for row in _list.get_children():
+		row.queue_free()
+	_rows.clear()
+	for kind in kinds:
+		_list.add_child(_weight_row(kind[0], kind[1]))
 
 
 func _weight_row(upgrade_id: String, upgrade) -> HBoxContainer:

@@ -19,13 +19,15 @@ Open them in the pause menu or on the title screen with the **Auto Brotato** but
 
 ### Crate items
 
-The **Crate items** page lists every item and weapon a crate can hold in your game. Click an item to cross it out: crossed-out items are recycled, all others are taken. With Abyssal Terrors, right-click an item to take it only when it is cursed, or only when its curse bonus is at least a percentage you choose. Weapons only come from crates for characters like the Survivor.
+The **Crate items** page lists every item a crate can hold in your game. It reads them from the game each time it opens, so items from updates, DLCs and other mods show up by themselves. Click an item to cross it out: crossed-out items are recycled, all others are taken. With Abyssal Terrors, right-click an item to take it only when it is cursed, or only when its curse bonus is at least a percentage you choose.
 
-A crate item the game won't let you take as it is waits for you: a Primal Dread meca weapon that still needs its effect chosen, or a weapon without a free slot and nothing to combine it with.
+When you own a character whose crates hold weapons, such as Primal Dread's Survivor, the page also has a **Weapons** tab that works the same way.
+
+Several crates at the end of a wave are answered one after another, and so are the extra items a Treasure Map or a Pearl adds to a crate. A crate item the game won't let you take as it is waits for you: a Primal Dread meca weapon that still needs its effect chosen, or a weapon without a free slot and nothing to combine it with.
 
 ### Level-ups
 
-The **Level-ups** page gives every level-up a weight from `0` to `100` (default `100`). When a level-up shows, one of the offered choices is picked with a chance in proportion to its weight, so with weights 80 and 20 the first is picked four times out of five. A weight of `0` is never picked, and when every offered choice has `0`, you pick yourself.
+The **Level-ups** page gives every level-up a weight from `0` to `100` (default `100`), including level-ups that other mods add. When a level-up shows, one of the offered choices is picked with a chance in proportion to its weight, so with weights 80 and 20 the first is picked four times out of five. A weight of `0` is never picked, and when every offered choice has `0`, you pick yourself.
 
 ### Next wave
 
@@ -34,4 +36,5 @@ The shop after wave 19 offers endless mode, so Auto Brotato leaves the choice to
 ## Compatibility
 
 - Brotato 1.2.0.4 with its built-in mod loader 6.3.0.
+- Its texts are in English, whatever language the game is set to.
 - No game script is replaced or extended, which keeps it compatible with mods that change the same screens.

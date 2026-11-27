@@ -37,6 +37,14 @@ func test_numbers_stay_in_their_range():
 	expect_eq(mod(MOD_ID).get_next_wave_limit(), 3.0, "a fractional wave limit")
 
 
+func test_texts_are_english_whatever_the_game_language():
+	var locale: String = TranslationServer.get_locale()
+	on_cleanup(TranslationServer, "set_locale", [locale])
+	TranslationServer.set_locale("de")
+	expect_eq(tr("AUTO_BROTATO_TAKE_ALL"), "Take all", "a page text with the game in German")
+	expect_eq(tr("AUTO_PICK_LEVEL_UPS"), "Pick level-ups", "a setting label with the game in German")
+
+
 func _read_json(path: String) -> Dictionary:
 	var file := File.new()
 	if file.open(path, File.READ) != OK:

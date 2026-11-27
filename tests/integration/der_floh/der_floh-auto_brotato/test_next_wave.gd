@@ -6,6 +6,7 @@ const MOD_ID := "der_floh-auto_brotato"
 const DELAY := 2.0
 const LEFT_ALONE_SEC := 1.5
 const ENDLESS_SHOP_WAVE := 19
+const HOURGLASS := "item_hourglass"
 
 
 func before_each():
@@ -63,6 +64,19 @@ func test_the_wave_limit_stops_auto_start():
 	use_setting(MOD_ID, "auto_start_next_wave", true)
 	yield(tree.create_timer(LEFT_ALONE_SEC), "timeout")
 	expect(shop() != null, "wave 2 is above the limit of 1")
+
+
+func test_the_wave_limit_counts_an_hourglass():
+	if not yield(fresh_run(), "completed"):
+		return
+	if not yield(give_item(HOURGLASS), "completed"):
+		return
+	if not yield(in_shop(), "completed"):
+		return
+	expect_eq(RunData.get_next_wave(), 1, "the next wave with an Hourglass")
+	use_setting(MOD_ID, "next_wave_limit", 1.0)
+	use_setting(MOD_ID, "auto_start_next_wave", true)
+	expect(yield(_await_wave(1), "completed"), "wave 1 started again, within the limit of 1")
 
 
 func test_the_endless_choice_is_left_to_the_player():

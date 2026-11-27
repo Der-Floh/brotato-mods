@@ -11,6 +11,11 @@ const ITEMS_PAGE := "Menus/AutoBrotatoItemsPage"
 const WEIGHTS_PAGE := "Menus/AutoBrotatoWeightsPage"
 const MAIN_MENU := "Menus/MainMenu"
 const SETTLE_SEC := 0.3
+const TEMPLATE_ITEM := "item_helmet"
+const NEW_ITEM := "item_auto_brotato_menu_test"
+const NEW_KIND := "upgrade_auto_brotato_menu_test"
+const ABYSSAL_TERRORS := "abyssal_terrors"
+const LAYOUT_FRAMES := 2
 
 var _pause_menu: Node
 
@@ -70,6 +75,46 @@ func test_a_level_up_weight_is_saved():
 	expect_eq(mod(MOD_ID).get_level_up_weights(), {"upgrade_armor": 40.0}, "weights after moving a slider")
 
 
+func test_the_pages_list_content_added_after_they_were_built():
+	if not yield(_paused_wave(), "completed"):
+		return
+	yield(_open_settings_page(_pause_menu, PAUSE_BUTTONS), "completed")
+	var settings_page = _pause_menu.get_node(SETTINGS_PAGE)
+	yield(_open_list_page(settings_page, "items_button_pressed"), "completed")
+	yield(press_key(KEY_ESCAPE), "completed")
+	_add_new_content()
+	yield(_open_list_page(settings_page, "items_button_pressed"), "completed")
+	var listed := []
+	for element in _pause_menu.get_node(ITEMS_PAGE)._elements:
+		listed.append(element.item.my_id)
+	expect(listed.has(NEW_ITEM), "the item page lists an item added after it first opened")
+	yield(press_key(KEY_ESCAPE), "completed")
+	yield(_open_list_page(settings_page, "weights_button_pressed"), "completed")
+	expect(_pause_menu.get_node(WEIGHTS_PAGE)._rows.has(NEW_KIND), "the level-up page lists a kind added after it was built")
+
+
+func test_the_item_page_fits_the_screen_with_every_curse_rule():
+	if not ProgressData.has_item_set(ABYSSAL_TERRORS):
+		skip("needs Abyssal Terrors")
+		return
+	if not yield(_paused_wave(), "completed"):
+		return
+	use_setting(MOD_ID, "item_rules", {})
+	yield(_open_settings_page(_pause_menu, PAUSE_BUTTONS), "completed")
+	yield(_open_list_page(_pause_menu.get_node(SETTINGS_PAGE), "items_button_pressed"), "completed")
+	var page = _pause_menu.get_node(ITEMS_PAGE)
+	_expect_on_screen(page, "the opened page")
+	var element = _cursable_element(page)
+	if not expect(element != null, "the page lists an item that can be cursed"):
+		return
+	element.emit_signal("gui_input", _right_click())
+	for mode_button in page._curse_buttons:
+		mode_button.emit_signal("pressed")
+		yield(frames(LAYOUT_FRAMES), "completed")
+		_expect_on_screen(page, mode_button.text)
+	expect(page._curse_slider.row.visible, "the curse bonus slider shows")
+
+
 func test_the_title_screen_opens_the_page():
 	var _changed = tree.change_scene(MenuData.title_screen_scene)
 	if not expect(yield(access.wait_until(access, "title_screen", 15000), "completed"), "the title screen opened"):
@@ -98,3 +143,54 @@ func _paused_wave():
 func _open_settings_page(menu_owner: Node, buttons_path: String):
 	menu_owner.get_node(buttons_path + "/" + BUTTON).emit_signal("pressed")
 	yield(tree.create_timer(SETTLE_SEC, true), "timeout")
+
+
+func _open_list_page(settings_page: Node, button_signal: String):
+	settings_page.emit_signal(button_signal)
+	yield(tree.create_timer(SETTLE_SEC, true), "timeout")
+
+
+## Adds a copy of a game item and of a level-up under new ids, as another mod would.
+func _add_new_content() -> void:
+	for template in ItemService.items:
+		if template.my_id == TEMPLATE_ITEM:
+			var item = template.duplicate()
+			item.my_id = NEW_ITEM
+			item.my_id_hash = Keys.generate_hash(NEW_ITEM)
+			_add_for_this_test(ItemService.items, item)
+			break
+	var upgrade = ItemService.upgrades[0].duplicate()
+	upgrade.upgrade_id = NEW_KIND
+	upgrade.upgrade_id_hash = Keys.generate_hash(NEW_KIND)
+	_add_for_this_test(ItemService.upgrades, upgrade)
+
+
+func _add_for_this_test(list: Array, element) -> void:
+	list.append(element)
+	on_cleanup(self, "_remove_from", [list, element])
+
+
+func _remove_from(list: Array, element) -> void:
+	list.erase(element)
+
+
+## Anything wider or taller than the screen grows the page's margin container past the screen's edge.
+func _expect_on_screen(page: Node, state: String) -> void:
+	var screen: Rect2 = page.get_viewport_rect()
+	var margin = page.get_child(0)
+	var content: Rect2 = margin.get_global_rect()
+	expect(screen.encloses(content), "%s: the page %s fits the screen %s" % [state, content, screen])
+
+
+static func _cursable_element(page: Node):
+	for element in page._elements:
+		if ItemService.can_item_be_cursed(element.item):
+			return element
+	return null
+
+
+static func _right_click() -> InputEventMouseButton:
+	var click := InputEventMouseButton.new()
+	click.button_index = BUTTON_RIGHT
+	click.pressed = true
+	return click

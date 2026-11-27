@@ -1,7 +1,8 @@
 extends Control
 
-## Every item and weapon a crate can hold. Clicking one crosses it out (recycled); with Abyssal Terrors,
-## right-click or the select button sets whether it is taken only when cursed.
+## Every item a crate can hold, and the weapons when a character's crates hold weapons. Clicking one crosses
+## it out (recycled); with Abyssal Terrors, right-click or the select button sets whether it is taken only
+## when cursed. The grid is read from the game's data whenever the page opens.
 
 signal back_button_pressed
 
@@ -27,7 +28,7 @@ const CURSE_MODE_TEXTS := ["AUTO_BROTATO_CURSE_ALWAYS", "AUTO_BROTATO_CURSE_ONLY
 
 var _settings: Node
 var _tab := TAB_ITEMS
-var _built_tab := -1
+var _grid_key := []
 var _elements := []
 var _grid: GridContainer
 var _tab_buttons := []
@@ -60,13 +61,11 @@ func setup(settings: Node) -> void:
 	column.add_child(back)
 
 
-## Called by the game's Menus.switch when the page opens; the grid is built on first use.
+## Called by the game's Menus.switch when the page opens.
 func init() -> void:
 	_close_curse_panel()
-	if _built_tab != _tab:
-		_build_grid()
-	else:
-		_refresh_looks()
+	_show_tabs(Catalog.crates_can_hold_weapons())
+	_update_grid()
 	if not _elements.empty():
 		Widgets.focus(_elements[0])
 
@@ -154,22 +153,47 @@ func _curse_editor() -> VBoxContainer:
 		var _connected = mode_button.connect("pressed", self, "_on_curse_mode_pressed", [CURSE_MODES[i]])
 		_curse_buttons.append(mode_button)
 		_curse_panel.add_child(mode_button)
-	_curse_slider = Widgets.slider_row(tr("AUTO_BROTATO_CURSE_BONUS"), 0.0, CURSE_MAX, CURSE_STEP)
+	_curse_slider = Widgets.stacked_slider_row(tr("AUTO_BROTATO_CURSE_BONUS"), 0.0, CURSE_MAX, CURSE_STEP)
 	var _connected = _curse_slider.slider.connect("value_changed", self, "_on_curse_slider_changed")
 	_curse_panel.add_child(_curse_slider.row)
 	return _curse_panel
 
 
+func _show_tabs(with_weapons: bool) -> void:
+	for tab_button in _tab_buttons:
+		tab_button.visible = with_weapons
+	if not with_weapons and _tab == TAB_WEAPONS:
+		_tab = TAB_ITEMS
+		_tab_buttons[TAB_ITEMS].pressed = true
+
+
 # --- Grid ---
 
-func _build_grid() -> void:
+func _update_grid() -> void:
+	var catalog: Array = Catalog.crate_weapons() if _tab == TAB_WEAPONS else Catalog.crate_items()
+	var key := _key_of(catalog)
+	if key == _grid_key:
+		_refresh_looks()
+	else:
+		_build_grid(catalog)
+		_grid_key = key
+
+
+func _key_of(catalog: Array) -> Array:
+	var key := [_tab]
+	for element_data in catalog:
+		key.append(Catalog.rule_id(element_data))
+	return key
+
+
+func _build_grid(catalog: Array) -> void:
 	for element in _elements:
 		element.queue_free()
 	_elements.clear()
 	var element_scene = Widgets.resource(INVENTORY_ELEMENT)
 	if element_scene == null:
 		return
-	for element_data in (Catalog.crate_weapons() if _tab == TAB_WEAPONS else Catalog.crate_items()):
+	for element_data in catalog:
 		var element = element_scene.instance()
 		_grid.add_child(element)
 		element.set_element(element_data)
@@ -179,7 +203,6 @@ func _build_grid() -> void:
 		var _input_connected = element.connect("gui_input", self, "_on_element_input", [element])
 		_elements.append(element)
 		_apply_look(element)
-	_built_tab = _tab
 
 
 func _refresh_looks() -> void:
@@ -281,7 +304,7 @@ func _on_tab_pressed(tab: int) -> void:
 		return
 	_tab = tab
 	_close_curse_panel()
-	_build_grid()
+	_update_grid()
 
 
 func _on_element_pressed(element: Control) -> void:

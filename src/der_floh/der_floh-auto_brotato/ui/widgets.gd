@@ -74,21 +74,28 @@ static func slider_row(text: String, min_value: float, max_value: float, step: f
 	row.add_constant_override("separation", ROW_SEPARATION)
 	var name_label := label(text)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var slider := HSlider.new()
-	slider.min_value = min_value
-	slider.max_value = max_value
-	slider.step = step
+	var slider := _slider(min_value, max_value, step)
 	slider.rect_min_size.x = SLIDER_WIDTH
-	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var slider_script = resource(SLIDER_SCRIPT)
-	if slider_script:
-		slider.set_script(slider_script)
-	var value_label := label("")
-	value_label.rect_min_size.x = VALUE_WIDTH
-	value_label.align = Label.ALIGN_RIGHT
+	var value_label := _value_label()
 	row.add_child(name_label)
 	row.add_child(slider)
 	row.add_child(value_label)
+	return {"row": row, "slider": slider, "value": value_label, "name": name_label}
+
+
+## A slider under a small caption, for panels too narrow for slider_row: {row, slider, value, name}.
+static func stacked_slider_row(text: String, min_value: float, max_value: float, step: float) -> Dictionary:
+	var row := VBoxContainer.new()
+	var name_label := label(text, FONT_SMALL)
+	var line := HBoxContainer.new()
+	line.add_constant_override("separation", ROW_SEPARATION)
+	var slider := _slider(min_value, max_value, step)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var value_label := _value_label()
+	line.add_child(slider)
+	line.add_child(value_label)
+	row.add_child(name_label)
+	row.add_child(line)
 	return {"row": row, "slider": slider, "value": value_label, "name": name_label}
 
 
@@ -103,6 +110,25 @@ static func is_cancel_released(event: InputEvent) -> bool:
 static func focus(control: Control) -> void:
 	if control != null and control.is_visible_in_tree():
 		control.grab_focus()
+
+
+static func _slider(min_value: float, max_value: float, step: float) -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value = min_value
+	slider.max_value = max_value
+	slider.step = step
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var slider_script = resource(SLIDER_SCRIPT)
+	if slider_script:
+		slider.set_script(slider_script)
+	return slider
+
+
+static func _value_label() -> Label:
+	var value_label := label("")
+	value_label.rect_min_size.x = VALUE_WIDTH
+	value_label.align = Label.ALIGN_RIGHT
+	return value_label
 
 
 static func _style_button(button: Button, text: String) -> void:
