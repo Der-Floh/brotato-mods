@@ -10,6 +10,8 @@ $TestModsDirectory = Join-Path $RunDirectory 'mods'
 $ScreenshotDirectory = Join-Path $RunDirectory 'screenshots'
 $SessionFile = Join-Path $RunDirectory 'session.json'
 $FingerprintFile = Join-Path $RunDirectory 'real-profile-fingerprint.json'
+$ProfileCheckFile = Join-Path $RunDirectory 'last-profile-check.json'
+$WatcherScript = Join-Path $PSScriptRoot 'session-watcher.ps1'
 
 $HarnessModId = 'der_floh-test_harness'
 $GameProcessName = 'Brotato'
@@ -45,6 +47,10 @@ $OverrideContent = @(
 $SteamLaunchVariables = 'SteamAppId', 'SteamGameId'
 $GameDirectoryVariable = 'BROTATO_GAME_DIR'
 $GameFolderInLibrary = 'common\Brotato'
+
+$SessionLockName = 'Local\der_floh-brotato-test-harness'
+$PopupTitle = 'Brotato test harness'
+$PopupWarningIcon = 0x30
 
 $TokenHeader = 'X-Harness-Token'
 $WindowResolution = '1280x720'
@@ -303,6 +309,30 @@ function Compare-ProfileFingerprint {
     @($names | Where-Object { $before.PSObject.Properties[$_] -eq $null -or -not $after.ContainsKey($_) -or $before.$_ -ne $after[$_] })
 }
 
+# Normal play changes the real profile too, so a session's fingerprint is compared once, when the session ends.
+function Invoke-ProfileCheck {
+    $changed = @(Compare-ProfileFingerprint)
+    Remove-Item -LiteralPath $FingerprintFile -ErrorAction SilentlyContinue
+    $check = [pscustomobject]@{ ok = $true; real_profile_unchanged = ($changed.Count -eq 0); changed_files = $changed }
+    $check | ConvertTo-Json | Set-Content -LiteralPath $ProfileCheckFile -Encoding UTF8
+    $check
+}
+
+# After the game was closed, the watcher already checked; repeating its result beats comparing a stale fingerprint.
+function Get-ProfileCheck {
+    if ((Test-Path -LiteralPath $ProfileCheckFile) -and -not (Test-Path -LiteralPath $FingerprintFile)) {
+        return Get-Content -LiteralPath $ProfileCheckFile -Raw | ConvertFrom-Json
+    }
+    Invoke-ProfileCheck
+}
+
+function Show-ProfileWarning {
+    param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ChangedFiles)
+
+    $message = "Your real profile $RealProfile changed during the test session:`n`n$($ChangedFiles -join "`n")`n`nCheck these files before the next session."
+    (New-Object -ComObject WScript.Shell).Popup($message, 0, $PopupTitle, $PopupWarningIcon) | Out-Null
+}
+
 # --- Session and API ---
 
 function Save-Session {
@@ -314,6 +344,32 @@ function Save-Session {
 function Get-Session {
     if (-not (Test-Path -LiteralPath $SessionFile)) { throw "No test session is running. Use 'harness.ps1 start' first." }
     Get-Content -LiteralPath $SessionFile -Raw | ConvertFrom-Json
+}
+
+function Get-RecordedSession {
+    if (Test-Path -LiteralPath $SessionFile) { Get-Session } else { $null }
+}
+
+# Held by start, stop and the session watcher, so a closed game is never cleaned up twice or mid-start.
+function Enter-SessionLock {
+    $lock = [System.Threading.Mutex]::new($false, $SessionLockName)
+    try { [void]$lock.WaitOne() }
+    catch [System.Threading.AbandonedMutexException] { Write-Verbose 'A harness process ended while holding the session lock; it is ours now.' }
+    $lock
+}
+
+function Exit-SessionLock {
+    param([Parameter(Mandatory)][System.Threading.Mutex]$Lock)
+
+    $Lock.ReleaseMutex()
+    $Lock.Dispose()
+}
+
+function Start-SessionWatcher {
+    param([Parameter(Mandatory)][int]$ProcessId)
+
+    $shell = (Get-Process -Id $PID).Path
+    Start-Process -FilePath $shell -ArgumentList "-NoProfile -NonInteractive -File `"$WatcherScript`" -ProcessId $ProcessId" -WindowStyle Hidden
 }
 
 function Get-FreePort {
@@ -349,7 +405,7 @@ function Wait-HarnessReady {
 
 <#
 .SYNOPSIS
-Builds the mods, switches to the test profile, launches the game with the chosen mods and waits for the harness API.
+Builds the mods, switches to the test profile, launches the game with the chosen mods, waits for the harness API and starts the watcher that ends the session when the game closes.
 #>
 function Start-HarnessSession {
     [CmdletBinding()]
@@ -362,56 +418,91 @@ function Start-HarnessSession {
     )
 
     $game = Resolve-GameDirectory $GameDirectory
-    Assert-GameNotRunning
-    if (Test-Path -LiteralPath $SessionFile) { throw "A test session is still recorded in $SessionFile. Run 'harness.ps1 stop' first." }
-    Assert-NoForeignOverride $game
-    if (-not $NoBuild) { Invoke-ModBuild }
-    $modIds = @(Copy-TestMod -Mods $Mods -Extra $Extra)
-    Save-ProfileFingerprint
-    Update-TestProfileModList -ModIds $modIds
-
-    $session = @{ port = Get-FreePort; token = [guid]::NewGuid().ToString('N'); pid = 0; game_directory = $game }
-    Save-Session $session
-    Write-ProfileSwitch $game
-    $ready = $false
+    $lock = Enter-SessionLock
     try {
-        Start-GameProcess $session
-        $status = Wait-HarnessReady -Session $session -TimeoutSec $StartTimeoutSec
-        Assert-TestProfile $status
-        $ready = $true
+        Assert-GameNotRunning
+        if (Test-Path -LiteralPath $SessionFile) { throw "A test session is still recorded in $SessionFile. Run 'harness.ps1 stop' first." }
+        Assert-NoForeignOverride $game
+        if (-not $NoBuild) { Invoke-ModBuild }
+        $modIds = @(Copy-TestMod -Mods $Mods -Extra $Extra)
+        Save-ProfileFingerprint
+        Update-TestProfileModList -ModIds $modIds
+
+        $session = @{ port = Get-FreePort; token = [guid]::NewGuid().ToString('N'); pid = 0; game_directory = $game }
+        Save-Session $session
+        Write-ProfileSwitch $game
+        $ready = $false
+        try {
+            Start-GameProcess $session
+            $status = Wait-HarnessReady -Session $session -TimeoutSec $StartTimeoutSec
+            Assert-TestProfile $status
+            $ready = $true
+        }
+        finally {
+            if (-not $ready) { Stop-GameProcess }
+            Remove-ProfileSwitch $game
+        }
+        $session.pid = $status.pid
+        Save-Session $session
+        Start-SessionWatcher $session.pid
+        [pscustomobject]@{ ok = $true; mods = $modIds; status = $status }
     }
     finally {
-        if (-not $ready) { Stop-GameProcess }
-        Remove-ProfileSwitch $game
+        Exit-SessionLock $lock
     }
-    $session.pid = $status.pid
-    Save-Session $session
-    [pscustomobject]@{ ok = $true; mods = $modIds; status = $status }
 }
 
 <#
 .SYNOPSIS
-Quits the game (killing it if it is frozen), removes a leftover override.cfg and reports whether your real profile stayed unchanged. Also repairs an interrupted session.
+Quits the game (killing it if it is frozen), removes a leftover override.cfg and reports whether your real profile stayed unchanged. Also repairs an interrupted session; after the game was closed, it reports the check the watcher made then.
 #>
 function Stop-HarnessSession {
     [CmdletBinding()]
     param([string]$GameDirectory)
 
-    $session = if (Test-Path -LiteralPath $SessionFile) { Get-Session } else { $null }
-    $game = if ($session -and $session.PSObject.Properties['game_directory']) { $session.game_directory } else { Resolve-GameDirectory $GameDirectory }
-    if ($session) {
-        try { Invoke-HarnessCommand -Name 'quit' -Session $session -TimeoutSec $ProbeTimeoutSec | Out-Null }
-        catch { Write-Verbose "Quit request failed, the game may already be closed: $($_.Exception.Message)" }
-        # A frozen game never handles quit; killing it is safe because it only ever runs in the test profile.
-        if (-not (Wait-GameExit)) { Stop-SessionGame $session }
+    $lock = Enter-SessionLock
+    try {
+        $session = Get-RecordedSession
+        $game = if ($session -and $session.PSObject.Properties['game_directory']) { $session.game_directory } else { Resolve-GameDirectory $GameDirectory }
+        if ($session) {
+            try { Invoke-HarnessCommand -Name 'quit' -Session $session -TimeoutSec $ProbeTimeoutSec | Out-Null }
+            catch { Write-Verbose "Quit request failed, the game may already be closed: $($_.Exception.Message)" }
+            # A frozen game never handles quit; killing it is safe because it only ever runs in the test profile.
+            if (-not (Wait-GameExit)) { Stop-SessionGame $session }
+            Remove-Item -LiteralPath $SessionFile
+        }
+        elseif (Test-GameRunning) {
+            throw 'Brotato is running without a recorded test session; leaving it alone.'
+        }
+        Remove-ProfileSwitch $game
+        Get-ProfileCheck
+    }
+    finally {
+        Exit-SessionLock $lock
+    }
+}
+
+<#
+.SYNOPSIS
+Waits until the game with this process id exits, then ends its session as stop would, unless stop already did, and warns in a popup if your real profile changed. start runs it hidden through session-watcher.ps1.
+#>
+function Wait-HarnessSessionEnd {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][int]$ProcessId)
+
+    Get-Process -Id $ProcessId -ErrorAction SilentlyContinue | Where-Object ProcessName -eq $GameProcessName | Wait-Process
+    $lock = Enter-SessionLock
+    try {
+        $session = Get-RecordedSession
+        if (-not $session -or $session.pid -ne $ProcessId) { return }
         Remove-Item -LiteralPath $SessionFile
+        Remove-ProfileSwitch $session.game_directory
+        $check = Invoke-ProfileCheck
     }
-    elseif (Test-GameRunning) {
-        throw 'Brotato is running without a recorded test session; leaving it alone.'
+    finally {
+        Exit-SessionLock $lock
     }
-    Remove-ProfileSwitch $game
-    $changed = @(Compare-ProfileFingerprint)
-    [pscustomobject]@{ ok = $true; real_profile_unchanged = ($changed.Count -eq 0); changed_files = $changed }
+    if (-not $check.real_profile_unchanged) { Show-ProfileWarning $check.changed_files }
 }
 
 <#
@@ -466,4 +557,4 @@ function Get-HarnessRunDirectory { $RunDirectory }
 
 function Get-HarnessTestProfile { $TestProfile }
 
-Export-ModuleMember -Function Start-HarnessSession, Stop-HarnessSession, Invoke-HarnessCommand, Get-HarnessLog, Clear-HarnessModConfig, Test-HarnessGameRunning, Invoke-HarnessBuild, Get-HarnessRunDirectory, Get-HarnessTestProfile
+Export-ModuleMember -Function Start-HarnessSession, Stop-HarnessSession, Wait-HarnessSessionEnd, Invoke-HarnessCommand, Get-HarnessLog, Clear-HarnessModConfig, Test-HarnessGameRunning, Invoke-HarnessBuild, Get-HarnessRunDirectory, Get-HarnessTestProfile

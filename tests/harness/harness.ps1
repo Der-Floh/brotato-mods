@@ -11,6 +11,8 @@ eval        Runs GDScript inside the game, e.g.  harness.ps1 eval 'return RunDat
 screenshot  Saves a screenshot to run/screenshots/ and prints its path.
 log         Prints the end of the test profile's godot.log (modloader.log with -ModLoader).
 
+Closing the game ends a session too: a hidden watcher started by 'start' then runs the same profile check as 'stop' and shows a popup if your real profile changed.
+
 Your real saves, settings, mod configs and logs in %APPDATA%\Brotato are never used: a temporary override.cfg points the game at %APPDATA%\Brotato Test while it starts. The game folder comes from -GameDirectory, the BROTATO_GAME_DIR environment variable, or your Steam libraries.
 
 .EXAMPLE

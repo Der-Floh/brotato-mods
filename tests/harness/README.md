@@ -16,12 +16,12 @@ Brotato's Steam build loads only the Workshop items you are subscribed to and ig
 - **Separate profile.** The test profile is outside what Steam Cloud syncs. The harness mod deletes `override.cfg` as soon as it loads, and `start` deletes it again in every outcome.
 - **Wrong-profile guard.** A harness-launched game that finds itself in any other profile kills itself before it can save, and `start` refuses a game whose `status` reports another `user_data_dir`.
 - **No achievements.** Challenges completed in an ordinary save also unlock your Steam achievements. The harness turns the test profile's save into an unlock-all save, the game's own option, which never reports them; it also unlocks every character, weapon, item and difficulty for the tests.
-- **Check at the end.** `start` hashes every file in your real profile; `stop` prints `real_profile_unchanged` and lists any file that changed.
+- **Check at the end.** `start` hashes every file in your real profile, and the end of the session compares them: `stop` prints `real_profile_unchanged` and lists any file that changed. When you close the game instead, the session watcher runs the same check at once and shows a popup if a file changed.
 - **Local only.** The API listens on 127.0.0.1 and needs the random per-session token in the `X-Harness-Token` header.
 
 ## Usage
 
-Run from the repo root in PowerShell 7 or Windows PowerShell 5.1, with Steam running, and always finish with `stop`:
+Run from the repo root in PowerShell 7 or Windows PowerShell 5.1, with Steam running, and finish with `stop` or by closing the game:
 
 ```powershell
 ./tests/harness/harness.ps1 start -Compact
@@ -40,7 +40,9 @@ Run from the repo root in PowerShell 7 or Windows PowerShell 5.1, with Steam run
 | `eval '<gdscript>'` | Runs GDScript inside the game. |
 | `screenshot [name]` | Saves `run/screenshots/<name>.png` and prints its path. |
 | `log [-Lines N] [-ModLoader]` | Prints the end of the test profile's `godot.log`, or `modloader.log`. |
-| `stop` | Quits the game (killing it if it is frozen), removes a leftover `override.cfg` and runs the profile check. It also repairs an interrupted session. |
+| `stop` | Quits the game (killing it if it is frozen), removes a leftover `override.cfg` and runs the profile check. It also repairs an interrupted session. After you closed the game, it prints the check the watcher made then. |
+
+`start` also launches [`session-watcher.ps1`](session-watcher.ps1) in a hidden window. It waits for the game to exit, and if the session is still recorded then, because you closed the game or it crashed, it ends the session the way `stop` does: it removes `session.json`, runs the profile check right away, before normal play can change your real profile, and shows a popup if a file changed. `start`, `stop` and the watcher share a lock, so they never end the same session twice. If the watcher fails, it writes `run/session-watcher.log` and the session stays recorded until `stop`.
 
 `-Compact` prints `status`, `call` and `eval` results on one line without the mod list. The game folder comes from `-GameDirectory`, the `BROTATO_GAME_DIR` environment variable, or your Steam libraries.
 
@@ -90,9 +92,10 @@ return ids'
 ```
 harness.ps1                          command line
 Harness.psm1                         session logic, shared with run-integration.ps1
+session-watcher.ps1                  ends a session when its game closes; start runs it hidden
 bootstrap/mod_loader_store.gd        the ModLoaderStore replacement that loads run/mods
 src/der_floh/der_floh-test_harness/  the GML mod: mod_main, server, commands, game_access, eval_runner, test_runner, integration_test, profile_switch, json_value
-run/                                 created by the harness, ignored by git: build/, mods/, screenshots/, results/, session.json, real-profile-fingerprint.json
+run/                                 created by the harness, ignored by git: build/, mods/, screenshots/, results/, session.json, real-profile-fingerprint.json, last-profile-check.json
 ```
 
 The test profile lives in `%APPDATA%\Brotato Test`; delete it whenever you want a clean slate.
