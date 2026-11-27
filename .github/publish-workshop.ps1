@@ -9,9 +9,9 @@ Run it once the Publish Release workflow has attached a release's zips. It lists
 - The upload's content folder holds only that zip, because Brotato's mod loader loads every zip in a Workshop item.
 - The change note is the version's section of the changelog.md inside the zip, converted to Steam's BBCode, unless -ChangeNote is given.
 - An existing item keeps the title, description, preview, tags and visibility set on its Workshop page; -UpdateDescription also replaces its description with the README.md inside the zip.
-- A mod without an item gets a new hidden item, titled with its README heading, with the README as description and the mod's media/preview.png as preview image when there is one. Set its tags and visibility on its Workshop page, then make it public.
+- A mod without an item gets a new hidden item, titled with its README heading, with the README as description and the mod's media/preview.png as preview image when there is one. steamcmd can't set tags; set them as the README's Publishing section describes, then make the item public on its Workshop page.
 
-After each upload, the item id and the uploaded version are written to .github/workshop-items.json; commit that file. gh must be signed in to read the releases and check the zips. steamcmd logs in with your Steam account: it asks for your password and Steam Guard code the first time, then reuses the saved login, and your Steam client may be signed out while it uploads.
+After each upload, the item id and the uploaded version are written to .github/workshop-items.json; commit that file. gh must be signed in to read the releases and check the zips. steamcmd logs in with your Steam account: it asks for your password and Steam Guard code the first time, then reuses the saved login. Its login replaces your Steam client's session, and the client doesn't reconnect by itself, so reconnect it afterwards.
 
 .PARAMETER Tag
 The release to upload, such as v1.2.0, instead of picking one from the list.

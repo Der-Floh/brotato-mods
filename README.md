@@ -26,7 +26,9 @@ Every mod in this repository has its own README with all its settings, linked fr
 
 ### [Auto Brotato](src/der_floh/der_floh-auto_brotato/README.md) (`der_floh-auto_brotato`)
 
-<img src="src/der_floh/der_floh-auto_brotato/media/preview.png" alt="Auto Brotato" width="400">
+<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3846794587"><img src="src/der_floh/der_floh-auto_brotato/media/preview.png" alt="Auto Brotato" width="400"></a>
+
+Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3846794587).
 
 Takes over the routine clicks at the end of a wave: it recycles crate items you don't want, takes the ones you do, picks level-ups by weight and starts the next wave, after an optional countdown that Esc cancels. Each of the four is switched on and off on its own, and all are off until you switch them on. It only presses the game's own buttons, so everything after the click works as if you had clicked yourself.
 
@@ -82,7 +84,15 @@ Every mod folder has a `README.md`, which is packed into the zip like the mod's 
 
 Without `-SteamUser` or the `STEAM_USER` environment variable, the upload asks for your Steam account name.
 
-The Workshop gets exactly the zip attached to the release: the script downloads it with [GitHub CLI](https://cli.github.com/) and refuses it unless `gh attestation verify` confirms the release workflow built it. Its README and changelog come from inside the zip too, so they match the released version. The upload uses [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), which asks for your password and Steam Guard code the first time and then reuses the saved login; your Steam client may be signed out while it uploads. Your login never leaves your PC. An existing item keeps the title, description, preview image, tags and visibility of its Workshop page (`-UpdateDescription` replaces the description with the converted README). A mod without an item gets a new hidden one, titled with its README heading and with `media/preview.png` as preview image; set its tags and make it public on its Workshop page.
+The Workshop gets exactly the zip attached to the release: the script downloads it with [GitHub CLI](https://cli.github.com/) and refuses it unless `gh attestation verify` confirms the release workflow built it. Its README and changelog come from inside the zip too, so they match the released version. The upload uses [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), which asks for your password and Steam Guard code the first time and then reuses the saved login. Its login replaces your Steam client's session, and the client doesn't reconnect by itself, so reconnect it afterwards. Your login never leaves your PC. An existing item keeps the title, description, preview image, tags and visibility of its Workshop page (`-UpdateDescription` replaces the description with the converted README). A mod without an item gets a new hidden one, titled with its README heading and with `media/preview.png` as preview image. Make it public on its Workshop page.
+
+SteamCMD can't set tags, so a new item gets them once from Brotato's own uploader, `GodotWorkshopUtility.exe` in the game folder, which offers the tags in the game's `steam_data.json` (at most 5). Start it with Brotato's app id, so it can reach Steam:
+
+```powershell
+$env:SteamAppId = '1942280'; & '<Steam library>\steamapps\common\Brotato\GodotWorkshopUtility.exe'
+```
+
+Give it the item's Workshop ID, the tags and the release's zip. Always fill in the Workshop ID, or it creates another item. It also uploads the zip again and sets the item's title to the zip's file name, so pick a copy of the release zip named after the mod's title, such as `Auto Brotato.zip`. Later uploads with the script keep the tags.
 
 ## Integration tests
 
