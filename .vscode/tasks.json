@@ -47,10 +47,10 @@
             "label": "Publish to the Workshop (dry run)",
             "type": "process",
             "command": "pwsh",
-            "args": ["-NoProfile", "-File", "${workspaceFolder}/.vscode/build/publish-workshop.ps1", "-DryRun"],
+            "args": ["-NoProfile", "-File", "${workspaceFolder}/.github/publish-workshop.ps1", "-DryRun"],
             "windows": {
                 "command": "powershell.exe",
-                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/build/publish-workshop.ps1", "-DryRun"]
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.github/publish-workshop.ps1", "-DryRun"]
             },
             "problemMatcher": []
         },
@@ -58,10 +58,10 @@
             "label": "Publish to the Workshop",
             "type": "process",
             "command": "pwsh",
-            "args": ["-NoProfile", "-File", "${workspaceFolder}/.vscode/build/publish-workshop.ps1"],
+            "args": ["-NoProfile", "-File", "${workspaceFolder}/.github/publish-workshop.ps1"],
             "windows": {
                 "command": "powershell.exe",
-                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.vscode/build/publish-workshop.ps1"]
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/.github/publish-workshop.ps1"]
             },
             "problemMatcher": []
         },

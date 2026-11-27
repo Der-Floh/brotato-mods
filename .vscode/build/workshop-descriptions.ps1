@@ -3,7 +3,7 @@
 Converts the README of every mod into the BBCode of its Steam Workshop description.
 
 .DESCRIPTION
-Workshop descriptions use Steam's BBCode, so each mod's README.md is converted: headings become [h1] to [h3], tables stay tables, inline code becomes bold and relative links point to the file on GitHub. Each description is written to <OutputDirectory>/<namespace>-<name>.txt, ready to paste into the Workshop item's description; publish-workshop.ps1 uses it for new items. Steam keeps only the first 8000 characters, so longer descriptions are reported.
+Workshop descriptions use Steam's BBCode, so each mod's README.md is converted: headings become [h1] to [h3], tables stay tables, inline code becomes bold and relative links point to the file on GitHub. Each description is written to <OutputDirectory>/<namespace>-<name>.txt, ready to preview or paste into the Workshop item's description; .github/publish-workshop.ps1 converts the README inside a release's zip the same way. Steam keeps only the first 8000 characters, so longer descriptions are reported.
 
 build.ps1 runs this script after packing the zips. Run it on its own to regenerate only the descriptions.
 

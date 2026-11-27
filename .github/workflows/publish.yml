@@ -1,0 +1,20 @@
+name: Publish Release
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: mod-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    uses: Der-Floh/Der-Floh/.github/workflows/mod-publish.yml@v1
+    with:
+      build-command: pwsh -NoProfile -File .vscode/build/build.ps1 && pwsh -NoProfile -File .vscode/build/validate.ps1

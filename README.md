@@ -28,8 +28,8 @@ Every mod in this repository has its own README with all its settings, linked fr
 | --- | --- |
 | `src/<author>/<namespace>-<name>/` | One mod each: `manifest.json`, `mod_main.gd`, `README.md`, `changelog.md`, its scripts and assets, and `media/` with the images for its Workshop page. |
 | `src/ThirdParty/` | Other authors' mods for reference and compatibility tests; see [Third-party mods](#third-party-mods). |
-| `.vscode/build/` | Build, validation and Workshop publishing scripts. |
-| `.github/` | GitHub workflows and `workshop-items.json`, the Workshop item of every published mod. |
+| `.vscode/build/` | Build and validation scripts. |
+| `.github/` | GitHub workflows, `publish-workshop.ps1`, which uploads a release to the Steam Workshop, and `workshop-items.json`, the Workshop item of every published mod. |
 | `tests/` | Integration tests that run inside the game, and the harness that drives it. |
 
 ## Building from source
@@ -49,17 +49,17 @@ Every mod folder has a `README.md`, which is packed into the zip like the mod's 
 
 ## Publishing
 
-GitHub runs the build and the validation on every push to `main` and every pull request. A release reaches players in two steps:
+[`ci.yml`](.github/workflows/ci.yml) builds and validates every push to `main` and every pull request and keeps the zips as an artifact. Both workflows use the shared [Mod CI and Mod Publish workflows](https://github.com/Der-Floh/Der-Floh/blob/main/.github/CI.md). A release reaches players in two steps:
 
-1. **GitHub release.** Bump the `version_number` of every changed mod, add a section for that version to its `changelog.md`, and publish a GitHub release. [`release.yml`](.github/workflows/release.yml) builds and validates the release tag and attaches every zip to the release, attested.
-2. **Steam Workshop.** On your PC, run [`.vscode/build/publish-workshop.ps1`](.vscode/build/publish-workshop.ps1). It uploads every mod whose version differs from the one [`.github/workshop-items.json`](.github/workshop-items.json) records, with its changelog section as change note, then records the item id and the uploaded version there; commit that file.
+1. **GitHub release.** Bump the `version_number` of every changed mod, add a section for that version to its `changelog.md`, and publish a GitHub release with a version tag such as `v1.2.0`. [`publish.yml`](.github/workflows/publish.yml) builds and validates the tag and attaches every mod's zip to the release, attested.
+2. **Steam Workshop.** On your PC, run [`.github/publish-workshop.ps1`](.github/publish-workshop.ps1). It lists the releases, newest first, with each mod's version and the one [`.github/workshop-items.json`](.github/workshop-items.json) records as uploaded, and asks which release to upload (`-Tag` picks one). It uploads every mod of that release whose version differs, with the version's changelog section as change note, then records the item id and the uploaded version; commit that file.
 
 ```powershell
-./.vscode/build/publish-workshop.ps1 -SteamUser <account> -DryRun
-./.vscode/build/publish-workshop.ps1 -SteamUser <account>
+./.github/publish-workshop.ps1 -SteamUser <account> -DryRun
+./.github/publish-workshop.ps1 -SteamUser <account>
 ```
 
-The script uses [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), which asks for your password and Steam Guard code the first time and then reuses the saved login; your Steam client may be signed out while it uploads. Your login never leaves your PC. An existing item keeps the title, description, preview image, tags and visibility of its Workshop page (`-UpdateDescription` replaces the description with the converted README). A mod without an item gets a new hidden one, titled with its README heading and with `media/preview.png` as preview image; set its tags and make it public on its Workshop page.
+The Workshop gets exactly the zip attached to the release: the script downloads it with [GitHub CLI](https://cli.github.com/) and refuses it unless `gh attestation verify` confirms the release workflow built it. Its README and changelog come from inside the zip too, so they match the released version. The upload uses [SteamCMD](https://developer.valvesoftware.com/wiki/SteamCMD), which asks for your password and Steam Guard code the first time and then reuses the saved login; your Steam client may be signed out while it uploads. Your login never leaves your PC. An existing item keeps the title, description, preview image, tags and visibility of its Workshop page (`-UpdateDescription` replaces the description with the converted README). A mod without an item gets a new hidden one, titled with its README heading and with `media/preview.png` as preview image; set its tags and make it public on its Workshop page.
 
 ## Integration tests
 
