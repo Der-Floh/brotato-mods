@@ -14,11 +14,32 @@ Subscribe to a mod on its Steam Workshop page and start Brotato: the game's buil
 
 ## Overview
 
-Every mod in this repository has its own README with all its settings, linked from the table below.
+Every mod in this repository has its own README with all its settings, linked from its heading below.
 
 | Mod | Author | Description |
 | --- | ------ | ----------- |
-| [Auto Brotato](src/der_floh/der_floh-auto_brotato/README.md) (`der_floh-auto_brotato`) | der_floh | Recycles unwanted crate items, takes wanted ones, picks level-ups by weight and starts the next wave, each switchable on its own |
+| [Auto Brotato](#auto-brotato-der_floh-auto_brotato) | der_floh | Recycles unwanted crate items, takes wanted ones, picks level-ups by weight and starts the next wave, each switchable on its own |
+
+---
+
+## Mods by me
+
+### [Auto Brotato](src/der_floh/der_floh-auto_brotato/README.md) (`der_floh-auto_brotato`)
+
+<img src="src/der_floh/der_floh-auto_brotato/media/preview.png" alt="Auto Brotato" width="400">
+
+Takes over the routine clicks at the end of a wave: it recycles crate items you don't want, takes the ones you do, picks level-ups by weight and starts the next wave, after an optional countdown that Esc cancels. Each of the four is switched on and off on its own, and all are off until you switch them on. It only presses the game's own buttons, so everything after the click works as if you had clicked yourself.
+
+Open the settings with the **Auto Brotato** button in the pause menu or on the title screen; with dami's or Oudstand's Mod Options, the switches and sliders also appear under Options → Mods. The **Crate items** page sets which items are recycled, and the **Level-ups** page how likely each level-up is picked.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Recycle unwanted crate items | Off | Recycles crate items you crossed out, and cursed-only items that aren't cursed enough |
+| Take wanted crate items | Off | Takes every other crate item |
+| Pick level-ups | Off | Picks one of the offered level-ups by their weights |
+| Start the next wave | Off | Presses Go in the shop |
+| Next wave delay | `0 s` | Waits up to 10 seconds first, with a countdown above the Go button; Esc cancels it for this shop |
+| Last wave to start | `0` | Stops starting waves after this wave; `0` never stops |
 
 ---
 
